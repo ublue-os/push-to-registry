@@ -85,5 +85,6 @@ runs:
 
     - name: Set Outputs
       id: set-outputs
+      shell: bash
       run: |
         echo "DIGEST=${DIGEST}" >> $GITHUB_OUTPUT
