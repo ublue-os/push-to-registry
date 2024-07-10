@@ -2,8 +2,11 @@ name: Push to Registry
 
 inputs:
   image:
-    description: 'The name of the image to push'
+    description: 'The desired name of the image to push'
     required: true
+  local-image-ref:
+    description: 'The reference to the local image to push'
+    required: false
   manifest-tags:
     description: 'The tags to apply to the manifest.  If pushing multiple compression formats, this should be the same for all formats.'
     required: true
@@ -65,6 +68,7 @@ runs:
       id: push-single
       shell: bash
       env:
+        LOCAL_IMAGE_REF: ${{ inputs.local-image-ref }}
         MANIFEST_TAGS: ${{ inputs.manifest-tags }}
         IMAGE: ${{ inputs.image }}
         REGISTRY: ${{ inputs.registry }}
@@ -72,6 +76,6 @@ runs:
       run: |
         IFS=' ' read -r -a manifest_tags <<< "${MANIFEST_TAGS}"
         for tag in "${manifest_tags[@]}"; do
-          podman image tag "${IMAGE}" "${REGISTRY}/${IMAGE}:${tag}"
+          podman image tag "${LOCAL_IMAGE_REF}" "${REGISTRY}/${IMAGE}:${tag}"
           podman push --compression-format "${COMPRESSION_FORMAT}" "${REGISTRY}/${IMAGE}:${tag}"
         done

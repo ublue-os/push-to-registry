@@ -26,7 +26,8 @@ jobs:
       - name: Push (Single)
         uses: ./
         with:
-          image: sample-image:local
+          local-image-ref: sample-image:local
+          image: sample-image
           manifest-tags: ${{ github.sha }}-${{ github.run_number }}
           registry: ghcr.io/${{ github.repository }}
           username: ${{ github.actor }}
