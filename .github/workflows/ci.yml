@@ -57,3 +57,25 @@ jobs:
         run: |
           RAW_MANIFEST=$(skopeo inspect --raw docker://${REGISTRY}/${IMAGE}:${MANIFEST_TAG} | jq -r .)
           echo "Raw Manifest: $RAW_MANIFEST"
+
+  test-multi-format:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Sample Image
+        working-directory: test
+        run: podman build -t sample-image:local .
+
+      - name: Push (Multiple)
+        uses: ./
+        id: push
+        with:
+          local-image-ref: sample-image:local
+          image: sample-image
+          manifest-tags: ${{ github.sha }}-${{ github.run_number }}
+          registry: ghcr.io/${{ github.repository }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          compression-formats: gzip zstd:chunked
