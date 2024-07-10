@@ -224,7 +224,7 @@ runs:
         done
 
         registry_paths_str=$(IFS=' '; echo "${registry_paths[*]}")
-        echo "REGISTRY_PATHS=$(echo "${manifests[@]}" | tr -d '\n' | jq -R -s -c 'split(" ")' >> $GITHUB_ENV
+        echo "REGISTRY_PATHS=$(echo "${manifests[@]}" | tr -d '\n' | jq -R -s -c 'split(" ")') >> $GITHUB_ENV
         echo "DIGEST=${manifest_digests[0]}" >> $GITHUB_ENV
         echo "REGISTRY_PATH=${registry_paths[0]}" >> $GITHUB_ENV
 
