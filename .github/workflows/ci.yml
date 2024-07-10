@@ -19,18 +19,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build Sample Image
+      - name: Build Test Image
         working-directory: test
         env:
           BUILD_IDENTIFIER: ${{ github.sha }}-${{ github.run_number }}-${{ github.run_id }}
-        run: podman build -t sample-image:local --build-arg=BUILD_IDENTIFIER=${BUILD_IDENTIFIER} .
+        run: podman build -t push-to-registry-action-ci:local --build-arg=BUILD_IDENTIFIER=${BUILD_IDENTIFIER} .
 
       - name: Push (Single)
         uses: ./
         id: push
         with:
-          local-image-ref: sample-image:local
-          image: sample-image
+          local-image-ref: push-to-registry-action-ci:local
+          image: push-to-registry-action-ci
           manifest-tags: ${{ github.sha }}-${{ github.run_number }} ${{ github.sha }}-${{ github.run_number }}-single
           registry: ghcr.io/${{ github.repository }}
           username: ${{ github.actor }}
@@ -45,7 +45,7 @@ jobs:
         env:
           MANIFEST_TAG: ${{ github.sha }}-${{ github.run_number }}
           REGISTRY: ghcr.io/${{ github.repository }}
-          IMAGE: sample-image
+          IMAGE: push-to-registry-action-ci
           DIGEST: ${{ steps.push.outputs.digest }}
         run: |
           MANIFEST=$(skopeo inspect docker://${REGISTRY}/${IMAGE}:${MANIFEST_TAG} | jq .)
@@ -59,7 +59,7 @@ jobs:
         env:
           MANIFEST_TAG: ${{ github.sha }}-${{ github.run_number }}
           REGISTRY: ghcr.io/${{ github.repository }}
-          IMAGE: sample-image
+          IMAGE: push-to-registry-action-ci
           DIGEST: ${{ steps.push.outputs.digest }}
         run: |
           RAW_MANIFEST=$(skopeo inspect --raw docker://${REGISTRY}/${IMAGE}:${MANIFEST_TAG} | jq -r .)
@@ -71,18 +71,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build Sample Image
+      - name: Build Test Image
         working-directory: test
         env:
           BUILD_IDENTIFIER: ${{ github.sha }}-${{ github.run_number }}-${{ github.run_id }}
-        run: podman build -t sample-image:local --build-arg=BUILD_IDENTIFIER=${BUILD_IDENTIFIER} .
+        run: podman build -t push-to-registry-action-ci:local --build-arg=BUILD_IDENTIFIER=${BUILD_IDENTIFIER} .
 
       - name: Push (Multiple)
         uses: ./
         id: push
         with:
-          local-image-ref: sample-image:local
-          image: sample-image
+          local-image-ref: push-to-registry-action-ci:local
+          image: push-to-registry-action-ci
           manifest-tags: ${{ github.sha }}-${{ github.run_number }} ${{ github.sha }}-${{ github.run_number }}-multi
           registry: ghcr.io/${{ github.repository }}
           username: ${{ github.actor }}
@@ -98,7 +98,7 @@ jobs:
         env:
           MANIFEST_TAG: ${{ github.sha }}-${{ github.run_number }}
           REGISTRY: ghcr.io/${{ github.repository }}
-          IMAGE: sample-image
+          IMAGE: push-to-registry-action-ci
           DIGEST: ${{ steps.push.outputs.digest }}
         run: |
           MANIFEST=$(skopeo inspect docker://${REGISTRY}/${IMAGE}:${MANIFEST_TAG} | jq .)
@@ -112,7 +112,7 @@ jobs:
         env:
           MANIFEST_TAG: ${{ github.sha }}-${{ github.run_number }}
           REGISTRY: ghcr.io/${{ github.repository }}
-          IMAGE: sample-image
+          IMAGE: push-to-registry-action-ci
           DIGEST: ${{ steps.push.outputs.digest }}
         run: |
           RAW_MANIFEST=$(skopeo inspect --raw docker://${REGISTRY}/${IMAGE}:${MANIFEST_TAG} | jq -r .)
