@@ -25,6 +25,7 @@ jobs:
 
       - name: Push (Single)
         uses: ./
+        id: push
         with:
           local-image-ref: sample-image:local
           image: sample-image
@@ -38,4 +39,11 @@ jobs:
           MANIFEST_TAG: ${{ github.sha }}-${{ github.run_number }}
           REGISTRY: ghcr.io/${{ github.repository }}
           IMAGE: sample-image
-        run: skopeo inspect --raw docker://${REGISTRY}/${IMAGE}:${MANIFEST_TAG} | jq .
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          MANIFEST=$(skopeo inspect --raw docker://${REGISTRY}/${IMAGE}:${MANIFEST_TAG} | jq .)
+          echo "Manifest: $MANIFEST"
+          if [[ $(echo $MANIFEST | jq -r .Digest) != $DIGEST ]]; then
+            echo "Digest mismatch - expected $DIGEST, got $(echo $MANIFEST | jq -r .Digest)"
+            exit 1
+          fi

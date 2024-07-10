@@ -39,7 +39,7 @@ outputs:
     value: ""
   digest:
     description: 'The digest of the pushed image.  If pushing multiple compression formats, this will be the digest of the manifest.'
-    value: ""
+    value: ${{ steps.set-outputs.outputs.DIGEST }}
 
 runs:
   using: 'composite'
@@ -79,3 +79,11 @@ runs:
           podman image tag "${LOCAL_IMAGE_REF}" "${REGISTRY}/${IMAGE}:${tag}"
           podman push --compression-format "${COMPRESSION_FORMAT}" "${REGISTRY}/${IMAGE}:${tag}"
         done
+        DIGEST=$(skopeo inspect docker://${REGISTRY}/${IMAGE}:${MANIFEST_TAGS} | jq -r '.Digest')
+        echo "DIGEST=${DIGEST}" >> $GITHUB_ENV
+
+
+    - name: Set Outputs
+      id: set-outputs
+      run: |
+        echo "DIGEST=${DIGEST}" >> $GITHUB_OUTPUT
