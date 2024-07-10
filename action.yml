@@ -153,7 +153,7 @@ runs:
           tagged_compression_image="${tagged_compression_images_array[$image]}"
 
           echo "Pushing ${tagged_compression_image} with compression ${format}..."
-          ${GITHUB_ACTION_PATH}/retry.sh ${RETRIES} podman push --compression-format "${format}" "${tagged_compression_image}"
+          ${GITHUB_ACTION_PATH}/helpers/retry.sh ${RETRIES} podman push --compression-format "${format}" "${tagged_compression_image}"
         done
 
     - name: Debug
