@@ -108,7 +108,7 @@ runs:
       # outputs:
       #   SANITIZED_COMPRESSION_FORMATS - The sanitized compression format names
       #   TAGGED_COMPRESSION_IMAGES - The tagged compression-specific image references
-      run:
+      run: |
         # Read the compression formats into an array
         IFS=' ' read -r -a compression_formats_array <<< "${COMPRESSION_FORMATS}"
 
