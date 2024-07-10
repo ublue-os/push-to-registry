@@ -25,9 +25,6 @@ inputs:
     description: 'A space-separated list of compression formats to use. Best to include gzip as the first option for compatibility'
     required: false
     default: 'gzip'
-  image-format:
-    description: 'The format of the image to be pushed.  Zstandard images must be pushed as OCI images.'
-    default: 'oci'
   retries:
     description: 'The number of retries for pushing images.'
     required: false
@@ -61,6 +58,7 @@ runs:
         MANIFEST_TAGS: ${{ inputs.manifest-tags }}
         COMPRESSION_FORMATS: ${{ inputs.compression-formats }}
         IMAGE: ${{ inputs.image }}
+        REGISTRY: ${{ inputs.registry }}
       # outputs:
       #   COMPRESSION_FORMAT_COUNT - The number of compression formats to push
       #   COMPRESSION_TAG - The tag prefix to use when pushing compression-specific images
@@ -72,8 +70,7 @@ runs:
         # Output the number of compression formats to push
         echo "COMPRESSION_FORMAT_COUNT=${#COMPRESSION_FORMATS[@]}" >> $GITHUB_OUTPUT
         echo "COMPRESSION_TAG=${MANIFEST_TAGS[0]}" >> $GITHUB_OUTPUT
-        echo "COMPRESSION_IMAGE_FULL=${IMAGE}:${MANIFEST_TAGS[0]}" >> $GITHUB_OUTPUT
-
+        echo "COMPRESSION_IMAGE_FULL=${REGISTRY}/${IMAGE}:${MANIFEST_TAGS[0]}" >> $GITHUB_OUTPUT
 
     - name: Push Image (Single)
       if: steps.metadata.outputs.COMPRESSION_FORMAT_COUNT == 1
@@ -105,6 +102,7 @@ runs:
         COMPRESSION_TAG: ${{ steps.metadata.outputs.COMPRESSION_TAG }}
         COMPRESSION_FORMATS: ${{ inputs.compression-formats }}
         COMPRESSION_IMAGE_FULL: ${{ steps.metadata.outputs.COMPRESSION_IMAGE_FULL }}
+        REGISTRY: ${{ inputs.registry }}
       # outputs:
       #   SANITIZED_COMPRESSION_FORMATS - The sanitized compression format names
       #   TAGGED_COMPRESSION_IMAGES - The tagged compression-specific image references
@@ -136,6 +134,27 @@ runs:
 
         echo "SANITIZED_COMPRESSION_FORMATS=${sanitized_compression_formats_str}" >> $GITHUB_OUTPUT
         echo "TAGGED_COMPRESSION_IMAGES=${tagged_compression_images_str}" >> $GITHUB_OUTPUT
+
+    - name: Push Compressed Images (Multiple)
+      if: steps.metadata.outputs.COMPRESSION_FORMAT_COUNT > 1
+      id: push-compressed
+      shell: bash
+      env:
+        REGISTRY: ${{ inputs.registry }}
+        TAGGED_COMPRESSION_IMAGES: ${{ steps.tag-compressed.outputs.TAGGED_COMPRESSION_IMAGES }}
+        COMPRESSION_FORMATS: ${{ inputs.compression-formats }}
+        RETRIES: ${{ inputs.retries }}
+      run: |
+        IFS=' ' read -r -a tagged_compression_images_array <<< "${TAGGED_COMPRESSION_IMAGES}"
+        IFS=' ' read -r -a compression_formats_array <<< "${COMPRESSION_FORMATS}"
+
+        for image in "${tagged_compression_images_array[@]}"; do
+          format="${compression_formats_array[$image]}"
+          tagged_compression_image="${tagged_compression_images_array[$image]}"
+
+          echo "Pushing ${tagged_compression_image} with compression ${format}..."
+          ${GITHUB_ACTION_PATH}/retry.sh ${RETRIES} podman push --compression-format "${format}" "${tagged_compression_image}"
+        done
 
     - name: Debug
       if: steps.metadata.outputs.COMPRESSION_FORMAT_COUNT > 1
