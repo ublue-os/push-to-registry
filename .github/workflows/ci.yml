@@ -34,7 +34,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Inspect Image
+      - name: Inspect Image Manifest
         env:
           MANIFEST_TAG: ${{ github.sha }}-${{ github.run_number }}
           REGISTRY: ghcr.io/${{ github.repository }}
@@ -42,9 +42,18 @@ jobs:
           DIGEST: ${{ steps.push.outputs.digest }}
         run: |
           MANIFEST=$(skopeo inspect docker://${REGISTRY}/${IMAGE}:${MANIFEST_TAG} | jq .)
-          RAW_MANIFEST=$(skopeo inspect --raw docker://${REGISTRY}/${IMAGE}:${MANIFEST_TAG} | jq .)
           echo "Manifest: $MANIFEST"
           if [[ $(echo $MANIFEST | jq -r .Digest) != $DIGEST ]]; then
             echo "Digest mismatch - expected $DIGEST, got $(echo $MANIFEST | jq -r .Digest)"
             exit 1
           fi
+
+      - name: Inspect Image Raw Manifest
+        env:
+          MANIFEST_TAG: ${{ github.sha }}-${{ github.run_number }}
+          REGISTRY: ghcr.io/${{ github.repository }}
+          IMAGE: sample-image
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          RAW_MANIFEST=$(skopeo inspect --raw docker://${REGISTRY}/${IMAGE}:${MANIFEST_TAG} | jq -r .)
+          echo "Raw Manifest: $RAW_MANIFEST"
