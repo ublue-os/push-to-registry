@@ -1,0 +1,49 @@
+name: Push to Registry
+
+inputs:
+  image:
+    description: 'The name of the image to push'
+    required: true
+  manifest-tags:
+    description: 'The tags to apply to the manifest.  If pushing multiple compression formats, this should be the same for all formats.'
+    required: true
+  registry:
+    description: 'The registry to push the image to'
+    required: true
+  username:
+    description: 'The username to authenticate with the registry'
+    required: false
+    default: ${{ github.actor }}
+  password:
+    description: 'The password to authenticate with the registry'
+    required: false
+    default: ${{ github.token }}
+  compression-formats:
+    description: 'A space-separated list of compression formats to use. Best to include gzip as the first option for compatibility'
+    required: false
+    default: 'gzip'
+  image-format:
+    description: 'The format of the image to be pushed.  Zstandard images must be pushed as OCI images.'
+    default: 'oci'
+  retries:
+    description: 'The number of retries for pushing images.'
+    required: false
+    default: 3
+
+outputs:
+  registry-path:
+    description: 'The location of the pushed image in the registry'
+    value: ""
+  digest:
+    description: 'The digest of the pushed image.  If pushing multiple compression formats, this will be the digest of the manifest.'
+    value: ""
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Login to Registry
+      uses: docker/login-action@0d4c9c5ea7693da7b068278f7b52bda2a190a446 # v3
+      with:
+        registry: ${{ inputs.registry }}
+        username: ${{ inputs.username }}
+        password: ${{ inputs.password }}

@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test-single-format:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Sample Image
+        working-directory: test
+        run: podman build -t ${{ github.repository }}/sample-image:local .
+
+      - name: Push (Single)
+        uses: ./
+        with:
+          image: ${{ github.repository }}/sample-image:local
+          manifest-tags: ${{ github.sha }}-${{ github.run_number }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          compression-formats: gzip
+
+      - name: Inspect Image
+        env:
+          MANIFEST_TAG: ${{ github.sha }}-${{ github.run_number }}
+        run: skopeo inspect --raw docker://ghcr.io/${{ github.repository }}/sample-image:${MANIFEST_TAG} | jq .
