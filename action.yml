@@ -148,9 +148,9 @@ runs:
         IFS=' ' read -r -a tagged_compression_images_array <<< "${TAGGED_COMPRESSION_IMAGES}"
         IFS=' ' read -r -a compression_formats_array <<< "${COMPRESSION_FORMATS}"
 
-        for image in "${tagged_compression_images_array[@]}"; do
-          format="${compression_formats_array[$image]}"
-          tagged_compression_image="${tagged_compression_images_array[$image]}"
+        for i in "${tagged_compression_images_array[@]}"; do
+          format="${compression_formats_array[$i]}"
+          tagged_compression_image="${tagged_compression_images_array[$i]}"
 
           echo "Pushing ${tagged_compression_image} with compression ${format}..."
           ${GITHUB_ACTION_PATH}/retry.sh ${RETRIES} podman push --compression-format "${format}" "${tagged_compression_image}"
