@@ -90,7 +90,7 @@ runs:
           podman image tag "${LOCAL_IMAGE_REF}" "${REGISTRY}/${IMAGE}:${tag}"
           podman push --compression-format "${COMPRESSION_FORMAT}" "${REGISTRY}/${IMAGE}:${tag}"
         done
-        DIGEST=$(skopeo inspect docker://${REGISTRY}/${IMAGE}:${MANIFEST_TAGS} | jq -r '.Digest')
+        DIGEST=$(skopeo inspect docker://${REGISTRY}/${IMAGE}:${MANIFEST_TAGS[0]} | jq -r .Digest)
         echo "DIGEST=${DIGEST}" >> $GITHUB_ENV
 
     - name: Tag Compressed Images (Multiple)
