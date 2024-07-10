@@ -47,3 +47,29 @@ runs:
         registry: ${{ inputs.registry }}
         username: ${{ inputs.username }}
         password: ${{ inputs.password }}
+
+    - name: Generate Metadata
+      id: metadata
+      env:
+        MANIFEST_TAGS: ${{ inputs.manifest-tags }}
+        COMPRESSION_FORMATS: ${{ inputs.compression-formats }}
+      run: |
+        IFS=' ' read -r -a COMPRESSION_FORMATS <<< "${COMPRESSION_FORMATS}"
+
+        # Output the number of compression formats to push
+        echo "COMPRESSION_FORMAT_COUNT=${#COMPRESSION_FORMATS[@]}" >> $GITHUB_OUTPUT
+
+    - name: Push Image (Single)
+      if: steps.metadata.outputs.COMPRESSION_FORMAT_COUNT == 1
+      id: push-single
+      env:
+        MANIFEST_TAGS: ${{ inputs.manifest-tags }}
+        IMAGE: ${{ inputs.image }}
+        REGISTRY: ${{ inputs.registry }}
+        COMPRESSION_FORMAT: ${{ inputs.compression-formats }}
+      run: |
+        IFS=' ' read -r -a manifest_tags <<< "${MANIFEST_TAGS}"
+        for tag in "${manifest_tags[@]}"; do
+          podman image tag "${IMAGE}" "${REGISTRY}/${IMAGE}:${tag}"
+          podman push --compression-format "${COMPRESSION_FORMAT}" "${REGISTRY}/${IMAGE}:${tag}"
+        done

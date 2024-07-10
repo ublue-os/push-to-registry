@@ -21,19 +21,20 @@ jobs:
 
       - name: Build Sample Image
         working-directory: test
-        run: podman build -t ${{ github.repository }}/sample-image:local .
+        run: podman build -t sample-image:local .
 
       - name: Push (Single)
         uses: ./
         with:
-          image: ${{ github.repository }}/sample-image:local
+          image: sample-image:local
           manifest-tags: ${{ github.sha }}-${{ github.run_number }}
-          registry: ghcr.io
+          registry: ghcr.io/${{ github.repository }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-          compression-formats: gzip
 
       - name: Inspect Image
         env:
           MANIFEST_TAG: ${{ github.sha }}-${{ github.run_number }}
-        run: skopeo inspect --raw docker://ghcr.io/${{ github.repository }}/sample-image:${MANIFEST_TAG} | jq .
+          REGISTRY: ghcr.io/${{ github.repository }}
+          IMAGE: sample-image
+        run: skopeo inspect --raw docker://${REGISTRY}/${IMAGE}:${MANIFEST_TAG} | jq .
