@@ -178,17 +178,48 @@ runs:
 
         echo "MANIFEST_NAMES=${manifest_names[*]}" >> $GITHUB_OUTPUT
 
-    - name: Debug
+    - name: Add Compressed Images to Manifests (Multiple)
       if: steps.metadata.outputs.COMPRESSION_FORMAT_COUNT > 1
+      id: add-to-manifests
       shell: bash
+      env:
+        SANITIZED_COMPRESSION_FORMATS: ${{ steps.tag-compressed.outputs.SANITIZED_COMPRESSION_FORMATS }}
+        COMPRESSION_IMAGE_FULL: ${{ steps.metadata.outputs.COMPRESSION_IMAGE_FULL }}
+        MANIFEST_NAMES: ${{ steps.create-manifests.outputs.MANIFEST_NAMES }}
       run: |
-        podman image ls
-        echo "SANITIZED_COMPRESSION_FORMATS=${{ steps.tag-compressed.outputs.SANITIZED_COMPRESSION_FORMATS }}"
-        echo "TAGGED_COMPRESSION_IMAGES=${{ steps.tag-compressed.outputs.TAGGED_COMPRESSION_IMAGES }}"
-        echo "COMPRESSION_FORMATS=${{ inputs.compression-formats }}"
-        echo "COMPRESSION_TAG=${{ steps.metadata.outputs.COMPRESSION_TAG }}"
-        echo "COMPRESSION_IMAGE_FULL=${{ steps.metadata.outputs.COMPRESSION_IMAGE_FULL }}"
-        echo "MANIFEST_NAMES=${{ steps.create-manifests.outputs.MANIFEST_NAMES }}"
+        IFS=' ' read -r -a sanitized_compression_formats_array <<< "${SANITIZED_COMPRESSION_FORMATS}"
+        IFS=' ' read -r -a manifest_names_array <<< "${MANIFEST_NAMES}"
+
+        for manifest_name in "${manifest_names_array[@]}"; do
+          for format in "${sanitized_compression_formats_array[@]}"; do
+            echo "Adding ${COMPRESSION_IMAGE_FULL}-${format} to ${manifest_name}"
+            if [[ "${format}" == zstd* ]]; then
+              echo "Adding zstd compression annotation to ${COMPRESSION_IMAGE_FULL}-${format}"
+              podman manifest add --annotation="io.github.containers.compression.zstd=true" ${manifest_name} ${COMPRESSION_IMAGE_FULL}-${format}
+            else
+              podman manifest add ${manifest_name} ${COMPRESSION_IMAGE_FULL}-${format}
+            fi
+          done
+        done
+
+    - name: Push Manifests (Multiple)
+      if: steps.metadata.outputs.COMPRESSION_FORMAT_COUNT
+      id: push-manifests
+      shell: bash
+      env:
+        MANIFEST_NAMES: ${{ steps.create-manifests.outputs.MANIFEST_NAMES }}
+        RETRIES: ${{ inputs.retries }}
+      run: |
+        IFS=' ' read -r -a manifest_names_array <<< "${MANIFEST_NAMES}"
+        manifest_digests=()
+
+        for manifest_name in "${manifest_names_array[@]}"; do
+          echo "Pushing manifest ${manifest_name}..."
+          ${GITHUB_ACTION_PATH}/helpers/retry.sh ${RETRIES} podman manifest push --all=false --format="${IMAGE_FORMAT}" ${manifest_name}
+          manifest_digests+=($(skopeo inspect docker://${manifest_name} --format '{{.Digest}}'))
+        done
+
+        echo "DIGEST=${manifest_digests[0]}" >> $GITHUB_ENV
 
     - name: Set Outputs
       id: set-outputs
