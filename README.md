@@ -1,6 +1,6 @@
 # push-to-registry
 
-A GitHub Action to push OCI images to a Docker registry.
+A GitHub Action to push OCI images of multiple compression formats to a Docker registry.
 
 The interface is inspired by the [redhat-actions/push-to-registry](https://github.com/redhat-actions/push-to-registry) action, but since this was missing a few key features (namely retries and pushing multiple compression formats), we have created our own implementation of it.
 
