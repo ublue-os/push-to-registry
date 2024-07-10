@@ -156,6 +156,28 @@ runs:
           ${GITHUB_ACTION_PATH}/helpers/retry.sh ${RETRIES} podman push --compression-format "${format}" "${tagged_compression_image}"
         done
 
+    - name: Create Manifests (Multiple)
+      if: steps.metadata.outputs.COMPRESSION_FORMAT_COUNT > 1
+      id: create-manifests
+      shell: bash
+      env:
+        MANIFEST_TAGS: ${{ inputs.manifest-tags }}
+        IMAGE_NAME: ${{ inputs.image }}
+        IMAGE_REGISTRY: ${{ inputs.registry }}
+      run: |
+        IFS=' ' read -r -a manifest_tags_array <<< "${MANIFEST_TAGS}"
+        manifest_names=()
+
+        for tag in "${manifest_tags_array[@]}"; do
+          manifest_name="${IMAGE_REGISTRY}/${IMAGE_NAME}:${tag}"
+          manifest_names+=("${manifest_name}")
+
+          echo "Creating manifest for ${manifest_name}..."
+          podman manifest create ${manifest_name}
+        done
+
+        echo "MANIFEST_NAMES=$(manifest_names[*])" >> $GITHUB_OUTPUT
+
     - name: Debug
       if: steps.metadata.outputs.COMPRESSION_FORMAT_COUNT > 1
       shell: bash
@@ -166,6 +188,7 @@ runs:
         echo "COMPRESSION_FORMATS=${{ inputs.compression-formats }}"
         echo "COMPRESSION_TAG=${{ steps.metadata.outputs.COMPRESSION_TAG }}"
         echo "COMPRESSION_IMAGE_FULL=${{ steps.metadata.outputs.COMPRESSION_IMAGE_FULL }}"
+        echo "MANIFEST_NAMES=${{ steps.create-manifests.outputs.MANIFEST_NAMES }}"
 
     - name: Set Outputs
       id: set-outputs
