@@ -203,7 +203,7 @@ runs:
         done
 
     - name: Push Manifests (Multiple)
-      if: steps.metadata.outputs.COMPRESSION_FORMAT_COUNT
+      if: steps.metadata.outputs.COMPRESSION_FORMAT_COUNT > 1
       id: push-manifests
       shell: bash
       env:
