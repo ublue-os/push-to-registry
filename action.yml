@@ -176,7 +176,7 @@ runs:
           podman manifest create ${manifest_name}
         done
 
-        echo "MANIFEST_NAMES=$(manifest_names[*])" >> $GITHUB_OUTPUT
+        echo "MANIFEST_NAMES=${manifest_names[*]}" >> $GITHUB_OUTPUT
 
     - name: Debug
       if: steps.metadata.outputs.COMPRESSION_FORMAT_COUNT > 1
