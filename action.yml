@@ -234,4 +234,4 @@ runs:
       run: |
         echo "DIGEST=${DIGEST}" >> $GITHUB_OUTPUT
         echo "REGISTRY_PATH=${REGISTRY_PATH}" >> $GITHUB_OUTPUT
-        echo "REGISTRY_PATHS=${REGISTRY_PATHS}" >> $GGITHUB_OUTPUT
+        echo "REGISTRY_PATHS=${REGISTRY_PATHS}" >> $GITHUB_OUTPUT
