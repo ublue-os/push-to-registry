@@ -33,10 +33,10 @@ inputs:
 outputs:
   registry-path:
     description: 'The first registry path to which the tag(s) were pushed.'
-    value: ""
+    value: ${{ steps.set-outputs.outputs.REGISTRY_PATH }}
   registry-paths:
     description: 'A JSON array of registry paths to which the tag(s) were pushed.'
-    value: ""
+    value: ${{ steps.set-outputs.outputs.REGISTRY_PATHS }}
   digest:
     description: 'The digest of the pushed image.  If pushing multiple compression formats, this will be the digest of the manifest.'
     value: ${{ steps.set-outputs.outputs.DIGEST }}
@@ -92,6 +92,8 @@ runs:
         done
         DIGEST=$(skopeo inspect docker://${REGISTRY}/${IMAGE}:${manifest_tags[0]} | jq -r .Digest)
         echo "DIGEST=${DIGEST}" >> $GITHUB_ENV
+        echo "REGISTRY_PATH=${REGISTRY}/${IMAGE}:${manifest_tags[0]}" >> $GITHUB_ENV
+        echo "REGISTRY_PATHS=$(echo "${REGISTRY}/${IMAGE}:${manifest_tags[@]}" | tr -d '\n' | jq -R -s -c 'split(" ")')" >> $GITHUB_ENV
 
     - name: Tag Compressed Images (Multiple)
       if: steps.metadata.outputs.COMPRESSION_FORMAT_COUNT > 1
@@ -212,17 +214,24 @@ runs:
       run: |
         IFS=' ' read -r -a manifest_names_array <<< "${MANIFEST_NAMES}"
         manifest_digests=()
+        registry_paths=()
 
         for manifest_name in "${manifest_names_array[@]}"; do
           echo "Pushing manifest ${manifest_name}..."
           ${GITHUB_ACTION_PATH}/helpers/retry.sh ${RETRIES} podman manifest push --all=false --format="${IMAGE_FORMAT}" ${manifest_name}
           manifest_digests+=($(skopeo inspect docker://${manifest_name} --format '{{.Digest}}'))
+          registry_paths+=("${manifest_name}")
         done
 
+        registry_paths_str=$(IFS=' '; echo "${registry_paths[*]}")
+        echo "REGISTRY_PATHS=$(echo "${manifests[@]}" | tr -d '\n' | jq -R -s -c 'split(" ")' >> $GITHUB_ENV
         echo "DIGEST=${manifest_digests[0]}" >> $GITHUB_ENV
+        echo "REGISTRY_PATH=${registry_paths[0]}" >> $GITHUB_ENV
 
     - name: Set Outputs
       id: set-outputs
       shell: bash
       run: |
         echo "DIGEST=${DIGEST}" >> $GITHUB_OUTPUT
+        echo "REGISTRY_PATH=${REGISTRY_PATH}" >> $GITHUB_OUTPUT
+        echo "REGISTRY_PATHS=${REGISTRY_PATHS}" >> $GGITHUB_OUTPUT
