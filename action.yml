@@ -35,7 +35,10 @@ inputs:
 
 outputs:
   registry-path:
-    description: 'The location of the pushed image in the registry'
+    description: 'The first registry path to which the tag(s) were pushed.'
+    value: ""
+  registry-paths:
+    description: 'A JSON array of registry paths to which the tag(s) were pushed.'
     value: ""
   digest:
     description: 'The digest of the pushed image.  If pushing multiple compression formats, this will be the digest of the manifest.'
