@@ -50,6 +50,7 @@ runs:
 
     - name: Generate Metadata
       id: metadata
+      shell: bash
       env:
         MANIFEST_TAGS: ${{ inputs.manifest-tags }}
         COMPRESSION_FORMATS: ${{ inputs.compression-formats }}
@@ -62,6 +63,7 @@ runs:
     - name: Push Image (Single)
       if: steps.metadata.outputs.COMPRESSION_FORMAT_COUNT == 1
       id: push-single
+      shell: bash
       env:
         MANIFEST_TAGS: ${{ inputs.manifest-tags }}
         IMAGE: ${{ inputs.image }}
