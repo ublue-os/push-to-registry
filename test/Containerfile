@@ -1,1 +1,5 @@
+ARG BUILD_IDENTIFIER
+
 FROM docker.io/library/hello-world:latest
+
+RUN echo "${BUILD_IDENTIFIER}" > /build-identifier.txt

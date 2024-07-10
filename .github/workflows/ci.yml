@@ -21,7 +21,9 @@ jobs:
 
       - name: Build Sample Image
         working-directory: test
-        run: podman build -t sample-image:local .
+        env:
+          BUILD_IDENTIFIER: ${{ github.sha }}-${{ github.run_number }}-${{ github.run_id }}
+        run: podman build -t sample-image:local --build-arg=BUILD_IDENTIFIER=${BUILD_IDENTIFIER} .
 
       - name: Push (Single)
         uses: ./
@@ -66,7 +68,9 @@ jobs:
 
       - name: Build Sample Image
         working-directory: test
-        run: podman build -t sample-image:local .
+        env:
+          BUILD_IDENTIFIER: ${{ github.sha }}-${{ github.run_number }}-${{ github.run_id }}
+        run: podman build -t sample-image:local --build-arg=BUILD_IDENTIFIER=${BUILD_IDENTIFIER} .
 
       - name: Push (Multiple)
         uses: ./
