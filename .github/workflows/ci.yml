@@ -92,7 +92,7 @@ jobs:
       - name: Read Outputs
         run: |
           echo "Digest: ${{ steps.push.outputs.digest }}"
-          echo "Registry Path": ${{ steps.push.outputs.registry-path }}
+          echo "Registry Path: ${{ steps.push.outputs.registry-path }}"
 
       - name: Inspect Image Manifest
         env:
