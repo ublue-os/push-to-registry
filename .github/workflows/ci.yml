@@ -41,7 +41,8 @@ jobs:
           IMAGE: sample-image
           DIGEST: ${{ steps.push.outputs.digest }}
         run: |
-          MANIFEST=$(skopeo inspect --raw docker://${REGISTRY}/${IMAGE}:${MANIFEST_TAG} | jq .)
+          MANIFEST=$(skopeo inspect docker://${REGISTRY}/${IMAGE}:${MANIFEST_TAG} | jq .)
+          RAW_MANIFEST=$(skopeo inspect --raw docker://${REGISTRY}/${IMAGE}:${MANIFEST_TAG} | jq .)
           echo "Manifest: $MANIFEST"
           if [[ $(echo $MANIFEST | jq -r .Digest) != $DIGEST ]]; then
             echo "Digest mismatch - expected $DIGEST, got $(echo $MANIFEST | jq -r .Digest)"
