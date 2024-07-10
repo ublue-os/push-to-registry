@@ -40,7 +40,6 @@ jobs:
         run: |
           echo "Digest: ${{ steps.push.outputs.digest }}"
           echo "Registry Path": ${{ steps.push.outputs.registry-path }}
-          echo "Registry Paths": ${{ steps.push.outputs.registry-paths }}
 
       - name: Inspect Image Manifest
         env:
@@ -94,7 +93,6 @@ jobs:
         run: |
           echo "Digest: ${{ steps.push.outputs.digest }}"
           echo "Registry Path": ${{ steps.push.outputs.registry-path }}
-          echo "Registry Paths": ${{ steps.push.outputs.registry-paths }}
 
       - name: Inspect Image Manifest
         env:
