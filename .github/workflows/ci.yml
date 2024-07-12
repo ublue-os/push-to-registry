@@ -29,7 +29,6 @@ jobs:
         uses: ./
         id: push
         with:
-          local-image-ref: push-to-registry-action-ci:local
           image: push-to-registry-action-ci
           manifest-tags: ${{ github.sha }}-${{ github.run_number }} ${{ github.sha }}-${{ github.run_number }}-single
           registry: ghcr.io/${{ github.repository }}
@@ -81,7 +80,6 @@ jobs:
         uses: ./
         id: push
         with:
-          local-image-ref: push-to-registry-action-ci:local
           image: push-to-registry-action-ci
           manifest-tags: ${{ github.sha }}-${{ github.run_number }} ${{ github.sha }}-${{ github.run_number }}-multi
           registry: ghcr.io/${{ github.repository }}

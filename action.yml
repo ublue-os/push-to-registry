@@ -4,9 +4,6 @@ inputs:
   image:
     description: 'The desired name of the image to push'
     required: true
-  local-image-ref:
-    description: 'The reference to the local image to push'
-    required: false
   manifest-tags:
     description: 'The tags to apply to the manifest.  If pushing multiple compression formats, this should be the same for all formats.'
     required: true
@@ -74,7 +71,6 @@ runs:
       id: push-single
       shell: bash
       env:
-        LOCAL_IMAGE_REF: ${{ inputs.local-image-ref }}
         MANIFEST_TAGS: ${{ inputs.manifest-tags }}
         IMAGE: ${{ inputs.image }}
         REGISTRY: ${{ inputs.registry }}
@@ -84,7 +80,7 @@ runs:
       run: |
         IFS=' ' read -r -a manifest_tags <<< "${MANIFEST_TAGS}"
         for tag in "${manifest_tags[@]}"; do
-          podman image tag "${LOCAL_IMAGE_REF}" "${REGISTRY}/${IMAGE}:${tag}"
+          podman image tag "${IMAGE}" "${REGISTRY}/${IMAGE}:${tag}"
           podman push --compression-format "${COMPRESSION_FORMAT}" "${REGISTRY}/${IMAGE}:${tag}"
         done
         DIGEST=$(skopeo inspect docker://${REGISTRY}/${IMAGE}:${manifest_tags[0]} | jq -r .Digest)
@@ -96,7 +92,7 @@ runs:
       id: tag-compressed
       shell: bash
       env:
-        LOCAL_IMAGE_REF: ${{ inputs.local-image-ref }}
+        IMAGE: ${{ inputs.image }}
         COMPRESSION_TAG: ${{ steps.metadata.outputs.COMPRESSION_TAG }}
         COMPRESSION_FORMATS: ${{ inputs.compression-formats }}
         COMPRESSION_IMAGE_FULL: ${{ steps.metadata.outputs.COMPRESSION_IMAGE_FULL }}
@@ -120,10 +116,10 @@ runs:
 
           # Create the full tag
           full_tag="${COMPRESSION_IMAGE_FULL}-${sanitized_format}"
-          echo "Tagging ${LOCAL_IMAGE_REF} as ${full_tag}..."
+          echo "Tagging ${IMAGE} as ${full_tag}..."
 
           # Tag the image using podman
-          podman image tag "${LOCAL_IMAGE_REF}" "${full_tag}"
+          podman image tag "${IMAGE}" "${full_tag}"
           tagged_compression_images+=("${full_tag}")
         done
 
