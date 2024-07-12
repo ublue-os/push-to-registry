@@ -1,0 +1,11 @@
+ARG BUILD_IDENTIFIER=""
+
+FROM docker.io/library/alpine:latest AS base
+
+ARG BUILD_IDENTIFIER
+
+RUN echo "BUILD_IDENTIFIER=${BUILD_IDENTIFIER}" > /etc/os-release
+
+FROM docker.io/library/hello-world:latest
+
+COPY --from=base /etc/os-release /etc/os-release

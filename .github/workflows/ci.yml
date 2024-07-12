@@ -1,0 +1,117 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  test-single-format:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Test Image
+        working-directory: test
+        env:
+          BUILD_IDENTIFIER: ${{ github.sha }}-${{ github.run_number }}-${{ github.run_id }}
+        run: podman build -t push-to-registry-action-ci:local --build-arg=BUILD_IDENTIFIER=${BUILD_IDENTIFIER} .
+
+      - name: Push (Single)
+        uses: ./
+        id: push
+        with:
+          image: push-to-registry-action-ci
+          manifest-tags: ${{ github.sha }}-${{ github.run_number }} ${{ github.sha }}-${{ github.run_number }}-single
+          registry: ghcr.io/${{ github.repository }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Read Outputs
+        run: |
+          echo "Digest: ${{ steps.push.outputs.digest }}"
+          echo "Registry Path": ${{ steps.push.outputs.registry-path }}
+
+      - name: Inspect Image Manifest
+        env:
+          MANIFEST_TAG: ${{ github.sha }}-${{ github.run_number }}
+          REGISTRY: ghcr.io/${{ github.repository }}
+          IMAGE: push-to-registry-action-ci
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          MANIFEST=$(skopeo inspect docker://${REGISTRY}/${IMAGE}:${MANIFEST_TAG} | jq .)
+          echo "Manifest: $MANIFEST"
+          if [[ $(echo $MANIFEST | jq -r .Digest) != $DIGEST ]]; then
+            echo "Digest mismatch - expected $DIGEST, got $(echo $MANIFEST | jq -r .Digest)"
+            exit 1
+          fi
+
+      - name: Inspect Image Raw Manifest
+        env:
+          MANIFEST_TAG: ${{ github.sha }}-${{ github.run_number }}
+          REGISTRY: ghcr.io/${{ github.repository }}
+          IMAGE: push-to-registry-action-ci
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          RAW_MANIFEST=$(skopeo inspect --raw docker://${REGISTRY}/${IMAGE}:${MANIFEST_TAG} | jq -r .)
+          echo "Raw Manifest: $RAW_MANIFEST"
+
+  test-multi-format:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Test Image
+        working-directory: test
+        env:
+          BUILD_IDENTIFIER: ${{ github.sha }}-${{ github.run_number }}-${{ github.run_id }}
+        run: podman build -t push-to-registry-action-ci:local --build-arg=BUILD_IDENTIFIER=${BUILD_IDENTIFIER} .
+
+      - name: Push (Multiple)
+        uses: ./
+        id: push
+        with:
+          image: push-to-registry-action-ci
+          manifest-tags: ${{ github.sha }}-${{ github.run_number }} ${{ github.sha }}-${{ github.run_number }}-multi
+          registry: ghcr.io/${{ github.repository }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          compression-formats: gzip zstd:chunked
+
+      - name: Read Outputs
+        run: |
+          echo "Digest: ${{ steps.push.outputs.digest }}"
+          echo "Registry Path: ${{ steps.push.outputs.registry-path }}"
+
+      - name: Inspect Image Manifest
+        env:
+          MANIFEST_TAG: ${{ github.sha }}-${{ github.run_number }}
+          REGISTRY: ghcr.io/${{ github.repository }}
+          IMAGE: push-to-registry-action-ci
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          MANIFEST=$(skopeo inspect docker://${REGISTRY}/${IMAGE}:${MANIFEST_TAG} | jq .)
+          echo "Manifest: $MANIFEST"
+          if [[ $(echo $MANIFEST | jq -r .Digest) != $DIGEST ]]; then
+            echo "Digest mismatch - expected $DIGEST, got $(echo $MANIFEST | jq -r .Digest)"
+            exit 1
+          fi
+
+      - name: Inspect Image Raw Manifest
+        env:
+          MANIFEST_TAG: ${{ github.sha }}-${{ github.run_number }}
+          REGISTRY: ghcr.io/${{ github.repository }}
+          IMAGE: push-to-registry-action-ci
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          RAW_MANIFEST=$(skopeo inspect --raw docker://${REGISTRY}/${IMAGE}:${MANIFEST_TAG} | jq -r .)
+          echo "Raw Manifest: $RAW_MANIFEST"

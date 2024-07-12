@@ -1,0 +1,226 @@
+name: Push to Registry
+
+inputs:
+  image:
+    description: 'The desired name of the image to push'
+    required: true
+  manifest-tags:
+    description: 'The tags to apply to the manifest.  If pushing multiple compression formats, this should be the same for all formats.'
+    required: true
+  registry:
+    description: 'The registry to push the image to'
+    required: true
+  username:
+    description: 'The username to authenticate with the registry'
+    required: false
+    default: ${{ github.actor }}
+  password:
+    description: 'The password to authenticate with the registry'
+    required: false
+    default: ${{ github.token }}
+  compression-formats:
+    description: 'A space-separated list of compression formats to use. Best to include gzip as the first option for compatibility'
+    required: false
+    default: 'gzip'
+  retries:
+    description: 'The number of retries for pushing images.'
+    required: false
+    default: 3
+
+outputs:
+  registry-path:
+    description: 'The first registry path to which the tag(s) were pushed.'
+    value: ${{ steps.set-outputs.outputs.REGISTRY_PATH }}
+  digest:
+    description: 'The digest of the pushed image.  If pushing multiple compression formats, this will be the digest of the manifest.'
+    value: ${{ steps.set-outputs.outputs.DIGEST }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Login to Registry
+      uses: docker/login-action@0d4c9c5ea7693da7b068278f7b52bda2a190a446 # v3
+      with:
+        registry: ${{ inputs.registry }}
+        username: ${{ inputs.username }}
+        password: ${{ inputs.password }}
+
+    - name: Generate Metadata
+      id: metadata
+      shell: bash
+      env:
+        MANIFEST_TAGS: ${{ inputs.manifest-tags }}
+        COMPRESSION_FORMATS: ${{ inputs.compression-formats }}
+        IMAGE: ${{ inputs.image }}
+        REGISTRY: ${{ inputs.registry }}
+      # outputs:
+      #   COMPRESSION_FORMAT_COUNT - The number of compression formats to push
+      #   COMPRESSION_TAG - The tag prefix to use when pushing compression-specific images
+      #   COMPRESSION_IMAGE_FULL - The full image reference to use when pushing compression-specific images
+      run: |
+        IFS=' ' read -r -a COMPRESSION_FORMATS <<< "${COMPRESSION_FORMATS}"
+        IFS=' ' read -r -a MANIFEST_TAGS <<< "${MANIFEST_TAGS}"
+
+        # Output the number of compression formats to push
+        echo "COMPRESSION_FORMAT_COUNT=${#COMPRESSION_FORMATS[@]}" >> $GITHUB_OUTPUT
+        echo "COMPRESSION_TAG=${MANIFEST_TAGS[0]}" >> $GITHUB_OUTPUT
+        echo "COMPRESSION_IMAGE_FULL=${REGISTRY}/${IMAGE}:${MANIFEST_TAGS[0]}" >> $GITHUB_OUTPUT
+
+    - name: Push Image (Single)
+      if: steps.metadata.outputs.COMPRESSION_FORMAT_COUNT == 1
+      id: push-single
+      shell: bash
+      env:
+        MANIFEST_TAGS: ${{ inputs.manifest-tags }}
+        IMAGE: ${{ inputs.image }}
+        REGISTRY: ${{ inputs.registry }}
+        COMPRESSION_FORMAT: ${{ inputs.compression-formats }}
+      # outputs:
+      #   DIGEST - The digest of the pushed image
+      run: |
+        IFS=' ' read -r -a manifest_tags <<< "${MANIFEST_TAGS}"
+        for tag in "${manifest_tags[@]}"; do
+          podman image tag "${IMAGE}" "${REGISTRY}/${IMAGE}:${tag}"
+          podman push --compression-format "${COMPRESSION_FORMAT}" "${REGISTRY}/${IMAGE}:${tag}"
+        done
+        DIGEST=$(skopeo inspect docker://${REGISTRY}/${IMAGE}:${manifest_tags[0]} | jq -r .Digest)
+        echo "DIGEST=${DIGEST}" >> $GITHUB_ENV
+        echo "REGISTRY_PATH=${REGISTRY}/${IMAGE}:${manifest_tags[0]}" >> $GITHUB_ENV
+
+    - name: Tag Compressed Images (Multiple)
+      if: steps.metadata.outputs.COMPRESSION_FORMAT_COUNT > 1
+      id: tag-compressed
+      shell: bash
+      env:
+        IMAGE: ${{ inputs.image }}
+        COMPRESSION_TAG: ${{ steps.metadata.outputs.COMPRESSION_TAG }}
+        COMPRESSION_FORMATS: ${{ inputs.compression-formats }}
+        COMPRESSION_IMAGE_FULL: ${{ steps.metadata.outputs.COMPRESSION_IMAGE_FULL }}
+        REGISTRY: ${{ inputs.registry }}
+      # outputs:
+      #   SANITIZED_COMPRESSION_FORMATS - The sanitized compression format names
+      #   TAGGED_COMPRESSION_IMAGES - The tagged compression-specific image references
+      run: |
+        # Read the compression formats into an array
+        IFS=' ' read -r -a compression_formats_array <<< "${COMPRESSION_FORMATS}"
+
+        # Initialize arrays for sanitized formats and tagged images
+        sanitized_compression_formats=()
+        tagged_compression_images=()
+
+        # Process each compression format
+        for format in "${compression_formats_array[@]}"; do
+          # Sanitize the format by replacing ':' with '-'
+          sanitized_format=$(echo "${format}" | tr ':' '-')
+          sanitized_compression_formats+=("${sanitized_format}")
+
+          # Create the full tag
+          full_tag="${COMPRESSION_IMAGE_FULL}-${sanitized_format}"
+          echo "Tagging ${IMAGE} as ${full_tag}..."
+
+          # Tag the image using podman
+          podman image tag "${IMAGE}" "${full_tag}"
+          tagged_compression_images+=("${full_tag}")
+        done
+
+        sanitized_compression_formats_str=$(IFS=' '; echo "${sanitized_compression_formats[*]}")
+        tagged_compression_images_str=$(IFS=' '; echo "${tagged_compression_images[*]}")
+
+        echo "SANITIZED_COMPRESSION_FORMATS=${sanitized_compression_formats_str}" >> $GITHUB_OUTPUT
+        echo "TAGGED_COMPRESSION_IMAGES=${tagged_compression_images_str}" >> $GITHUB_OUTPUT
+
+    - name: Push Compressed Images (Multiple)
+      if: steps.metadata.outputs.COMPRESSION_FORMAT_COUNT > 1
+      id: push-compressed
+      shell: bash
+      env:
+        REGISTRY: ${{ inputs.registry }}
+        TAGGED_COMPRESSION_IMAGES: ${{ steps.tag-compressed.outputs.TAGGED_COMPRESSION_IMAGES }}
+        COMPRESSION_FORMATS: ${{ inputs.compression-formats }}
+        RETRIES: ${{ inputs.retries }}
+      run: |
+        IFS=' ' read -r -a tagged_compression_images_array <<< "${TAGGED_COMPRESSION_IMAGES}"
+        IFS=' ' read -r -a compression_formats_array <<< "${COMPRESSION_FORMATS}"
+
+        for i in "${!compression_formats_array[@]}"; do
+          format="${compression_formats_array[$i]}"
+          tagged_compression_image="${tagged_compression_images_array[$i]}"
+
+          echo "Pushing ${tagged_compression_image} with compression ${format}..."
+          ${GITHUB_ACTION_PATH}/helpers/retry.sh ${RETRIES} podman push --compression-format "${format}" "${tagged_compression_image}"
+        done
+
+    - name: Create Manifests (Multiple)
+      if: steps.metadata.outputs.COMPRESSION_FORMAT_COUNT > 1
+      id: create-manifests
+      shell: bash
+      env:
+        MANIFEST_TAGS: ${{ inputs.manifest-tags }}
+        IMAGE_NAME: ${{ inputs.image }}
+        IMAGE_REGISTRY: ${{ inputs.registry }}
+      run: |
+        IFS=' ' read -r -a manifest_tags_array <<< "${MANIFEST_TAGS}"
+        manifest_names=()
+
+        for tag in "${manifest_tags_array[@]}"; do
+          manifest_name="${IMAGE_REGISTRY}/${IMAGE_NAME}:${tag}"
+          manifest_names+=("${manifest_name}")
+
+          echo "Creating manifest for ${manifest_name}..."
+          podman manifest create ${manifest_name}
+        done
+
+        echo "MANIFEST_NAMES=${manifest_names[*]}" >> $GITHUB_OUTPUT
+
+    - name: Add Compressed Images to Manifests (Multiple)
+      if: steps.metadata.outputs.COMPRESSION_FORMAT_COUNT > 1
+      id: add-to-manifests
+      shell: bash
+      env:
+        SANITIZED_COMPRESSION_FORMATS: ${{ steps.tag-compressed.outputs.SANITIZED_COMPRESSION_FORMATS }}
+        COMPRESSION_IMAGE_FULL: ${{ steps.metadata.outputs.COMPRESSION_IMAGE_FULL }}
+        MANIFEST_NAMES: ${{ steps.create-manifests.outputs.MANIFEST_NAMES }}
+      run: |
+        IFS=' ' read -r -a sanitized_compression_formats_array <<< "${SANITIZED_COMPRESSION_FORMATS}"
+        IFS=' ' read -r -a manifest_names_array <<< "${MANIFEST_NAMES}"
+
+        for manifest_name in "${manifest_names_array[@]}"; do
+          for format in "${sanitized_compression_formats_array[@]}"; do
+            echo "Adding ${COMPRESSION_IMAGE_FULL}-${format} to ${manifest_name}"
+            if [[ "${format}" == zstd* ]]; then
+              echo "Adding zstd compression annotation to ${COMPRESSION_IMAGE_FULL}-${format}"
+              podman manifest add --annotation="io.github.containers.compression.zstd=true" ${manifest_name} ${COMPRESSION_IMAGE_FULL}-${format}
+            else
+              podman manifest add ${manifest_name} ${COMPRESSION_IMAGE_FULL}-${format}
+            fi
+          done
+        done
+
+    - name: Push Manifests (Multiple)
+      if: steps.metadata.outputs.COMPRESSION_FORMAT_COUNT > 1
+      id: push-manifests
+      shell: bash
+      env:
+        MANIFEST_NAMES: ${{ steps.create-manifests.outputs.MANIFEST_NAMES }}
+        RETRIES: ${{ inputs.retries }}
+      run: |
+        IFS=' ' read -r -a manifest_names_array <<< "${MANIFEST_NAMES}"
+        manifest_digests=()
+        registry_paths=()
+
+        for manifest_name in "${manifest_names_array[@]}"; do
+          echo "Pushing manifest ${manifest_name}..."
+          ${GITHUB_ACTION_PATH}/helpers/retry.sh ${RETRIES} podman manifest push --all=false --format="${IMAGE_FORMAT}" "${manifest_name}"
+          manifest_digests+=($(skopeo inspect docker://${manifest_name} --format '{{.Digest}}'))
+          registry_paths+=("${manifest_name}")
+        done
+
+        echo "DIGEST=${manifest_digests[0]}" >> $GITHUB_ENV
+        echo "REGISTRY_PATH=${registry_paths[0]}" >> $GITHUB_ENV
+
+    - name: Set Outputs
+      id: set-outputs
+      shell: bash
+      run: |
+        echo "DIGEST=${DIGEST}" >> $GITHUB_OUTPUT
+        echo "REGISTRY_PATH=${REGISTRY_PATH}" >> $GITHUB_OUTPUT
